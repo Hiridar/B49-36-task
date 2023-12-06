@@ -1,0 +1,76 @@
+
+Design database for Zen class programme :
+
+
+//Find all the topics and tasks which are taught in the month of October
+topics.find({createdAt: {$gte: ISODate("2020-10-01T00:00:00Z"), $lt: ISODate("2020-11-01T00:00:00Z")}});
+tasks.find({createdAt: {$gte: ISODate("2020-10-01T00:00:00Z"), $lt: ISODate("2020-11-01T00:00:00Z")}});
+
+//Find all the company drives which appeared between 15 oct-2020 and 31-oct-2020
+company_drives.find({createdAt: {$gte: ISODate("2020-10-15T00:00:00Z"), $lt: ISODate("2020-11-01T00:00:00Z")}});
+
+//Find all the company drives and students who are appeared for the placement.
+company_drives.aggregate([
+ {
+    $lookup: {
+      from: "students",
+      localField: "_id",
+      foreignField: "applied_company_drive_id",
+      as: "appeared_students"
+    }
+ },
+ {
+    $match: { "appeared_students.length": { $gt: 0 } }
+ }
+]);
+
+//Find the number of problems solved by the user in codekata
+codekata.aggregate([
+ { $match: { user_id: "USER_ID" } },
+ { $group: { _id: null, totalProblems: { $sum: 1 } } }
+]);
+
+//Find all the mentors with who has the mentee's count more than 15
+mentors.aggregate([
+ {
+    $lookup: {
+      from: "mentees",
+      localField: "_id",
+      foreignField: "mentor_id",
+      as: "mentees"
+    }
+ },
+ {
+    $match: { "mentees.length": { $gt: 15 } }
+ }
+]);
+
+//Find the number of users who are absent and task is not submitted between 15 oct-2020 and 31-oct-2020
+users.aggregate([
+ {
+    $lookup: {
+      from: "attendance",
+      let: { user_id: "$_id" },
+      pipeline: [
+        { $match: { $expr: { $and: [{ $eq: ["$user_id", "$$user_id"] }] } } },
+        { $match: { createdAt: { $gte: ISODate("2020-10-15T00:00:00Z"), $lt: ISODate("2020-11-01T00:00:00Z") } } }
+      ],
+      as: "user_attendance"
+    }
+ },
+ {
+    $lookup: {
+      from: "tasks",
+      let: { user_id: "$_id" },
+      pipeline: [
+        { $match: { $expr: { $and: [{ $eq: ["$user_id", "$$user_id"] }] } } },
+        { $match: { createdAt: { $gte: ISODate("2020-10-15T00:00:00Z"), $lt: ISODate("2020-11-01T00:00:00Z") } } }
+      ],
+      as: "user_tasks"
+    }
+ },
+ {
+    $match: { $and: [{ "user_attendance.length": { $gt: 0 } }, { "user_tasks.length": 0 }] }
+ },
+ { $count: "totalAbsentUsers" }
+]);
